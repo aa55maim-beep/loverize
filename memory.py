@@ -1,65 +1,38 @@
-import sqlite3
 from datetime import date
-from pathlib import Path
+from uuid import uuid4
 
 import streamlit as st
-
-
-DATABASE_PATH = Path(__file__).resolve().parent / "plans.db"
-
-
-def get_connection():
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
+from data_store import require_supabase
 
 
 def initialize_database():
-    with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS memories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                memory_date TEXT NOT NULL,
-                title TEXT NOT NULL,
-                place TEXT,
-                memo TEXT,
-                image BLOB,
-                image_type TEXT
-            )
-            """
-        )
+    require_supabase()
 
 
-def add_memory(memory_date, title, place, memo, image, image_type):
-    with get_connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO memories
-                (memory_date, title, place, memo, image, image_type)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                memory_date.isoformat(),
-                title,
-                place,
-                memo,
-                image,
-                image_type,
-            ),
+def add_memory(memory_date, title, place, memo, image_file):
+    client = require_supabase()
+    image_path = None
+    if image_file:
+        image_path = f"memories/{uuid4().hex}_{image_file.name}"
+        client.storage.from_("memory-photos").upload(
+            image_path, image_file.getvalue(), {"content-type": image_file.type}
         )
+    client.table("memories").insert({
+        "memory_date": memory_date.isoformat(), "title": title,
+        "place": place, "memo": memo, "image_path": image_path,
+    }).execute()
 
 
 def get_memories():
-    with get_connection() as connection:
-        return connection.execute(
-            "SELECT * FROM memories ORDER BY memory_date DESC, id DESC"
-        ).fetchall()
+    return require_supabase().table("memories").select("*").order("memory_date", desc=True).order("id", desc=True).execute().data
 
 
 def delete_memory(memory_id):
-    with get_connection() as connection:
-        connection.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+    client = require_supabase()
+    memory = client.table("memories").select("image_path").eq("id", memory_id).single().execute().data
+    if memory and memory.get("image_path"):
+        client.storage.from_("memory-photos").remove([memory["image_path"]])
+    client.table("memories").delete().eq("id", memory_id).execute()
 
 
 def render_memory_tab():
@@ -94,15 +67,12 @@ def render_memory_tab():
             if not title.strip():
                 st.error("タイトルを入力してください。")
             else:
-                image = image_file.getvalue() if image_file else None
-                image_type = image_file.type if image_file else None
                 add_memory(
                     memory_date,
                     title.strip(),
                     place.strip(),
                     memo.strip(),
-                    image,
-                    image_type,
+                    image_file,
                 )
                 st.success("思い出を追加しました！")
                 st.rerun()
@@ -123,8 +93,9 @@ def render_memory_tab():
             st.markdown(f"<div class='memory-title'>{memory['title']}</div>", unsafe_allow_html=True)
             if memory["place"]:
                 st.caption(f"📍 {memory['place']}")
-            if memory["image"]:
-                st.image(memory["image"], use_container_width=True)
+            if memory.get("image_path"):
+                image_url = require_supabase().storage.from_("memory-photos").create_signed_url(memory["image_path"], 3600)["signedURL"]
+                st.image(image_url, use_container_width=True)
             if memory["memo"]:
                 st.write(memory["memo"])
             if st.button("削除", key=f"memory_delete_{memory['id']}"):

@@ -1,45 +1,19 @@
 import html
-import sqlite3
 from datetime import date
-from pathlib import Path
 
 import streamlit as st
-
-
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "plans.db"
-
-
-def get_connection():
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
+from data_store import require_supabase
 
 
 def initialize_database():
-    with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS plans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                plan_date TEXT NOT NULL,
-                end_date TEXT,
-                title TEXT NOT NULL,
-                place TEXT,
-                memo TEXT,
-                person TEXT NOT NULL
-            )
-            """
-        )
-        columns = {row["name"] for row in connection.execute("PRAGMA table_info(plans)")}
-        if "end_date" not in columns:
-            connection.execute("ALTER TABLE plans ADD COLUMN end_date TEXT")
-            connection.execute("UPDATE plans SET end_date = plan_date WHERE end_date IS NULL")
+    require_supabase()
+
+
 def add_plan(plan_date, end_date, title, place, memo, person):
-    with get_connection() as connection:
-        connection.execute(
-            "INSERT INTO plans (plan_date, end_date, title, place, memo, person) VALUES (?, ?, ?, ?, ?, ?)",
-            (plan_date.isoformat(), end_date.isoformat(), title, place, memo, person),
-        )
+    require_supabase().table("plans").insert({
+        "plan_date": plan_date.isoformat(), "end_date": end_date.isoformat(),
+        "title": title, "place": place, "memo": memo, "person": person,
+    }).execute()
 
 
 def get_plans(year, month):
@@ -49,20 +23,11 @@ def get_plans(year, month):
     else:
         next_month = date(year, month + 1, 1)
     last_day = (next_month.fromordinal(next_month.toordinal() - 1)).isoformat()
-    with get_connection() as connection:
-        return connection.execute(
-            """
-            SELECT * FROM plans
-            WHERE plan_date <= ? AND COALESCE(end_date, plan_date) >= ?
-            ORDER BY plan_date, id
-            """,
-            (last_day, first_day),
-        ).fetchall()
+    return require_supabase().table("plans").select("*").lte("plan_date", last_day).gte("end_date", first_day).order("plan_date").execute().data
 
 
 def delete_plan(plan_id):
-    with get_connection() as connection:
-        connection.execute("DELETE FROM plans WHERE id = ?", (plan_id,))
+    require_supabase().table("plans").delete().eq("id", plan_id).execute()
 
 
 def month_cells(year, month):

@@ -1,57 +1,29 @@
-import sqlite3
-from pathlib import Path
-
 import streamlit as st
+from data_store import require_supabase
 
 
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "plans.db"
 def get_connection():
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
+    return require_supabase()
 
 
 def initialize_database():
-    with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS wishlist (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                category TEXT NOT NULL,
-                person TEXT NOT NULL,
-                completed INTEGER NOT NULL DEFAULT 0
-            )
-            """
-        )
+    get_connection()
 
 
 def add_item(title, person):
-    with get_connection() as connection:
-        connection.execute(
-            "INSERT INTO wishlist (title, category, person) VALUES (?, ?, ?)",
-            (title, "", person),
-        )
+    get_connection().table("wishlist").insert({"title": title, "category": "", "person": person}).execute()
 
 
 def get_items():
-    with get_connection() as connection:
-        return connection.execute(
-            "SELECT * FROM wishlist ORDER BY completed, id DESC"
-        ).fetchall()
+    return get_connection().table("wishlist").select("*").order("completed").order("id", desc=True).execute().data
 
 
 def update_item(item_id, completed):
-    with get_connection() as connection:
-        connection.execute(
-            "UPDATE wishlist SET completed = ? WHERE id = ?",
-            (int(completed), item_id),
-        )
+    get_connection().table("wishlist").update({"completed": completed}).eq("id", item_id).execute()
 
 
 def delete_item(item_id):
-    with get_connection() as connection:
-        connection.execute("DELETE FROM wishlist WHERE id = ?", (item_id,))
+    get_connection().table("wishlist").delete().eq("id", item_id).execute()
 
 
 def render_wishlist_tab(people):
