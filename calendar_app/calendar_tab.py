@@ -7,8 +7,6 @@ import streamlit as st
 
 
 DATABASE_PATH = Path(__file__).resolve().parent.parent / "plans.db"
-PERSON_COLORS = {"まい": "#ff7aa8", "かず": "#68b7ff", "2人": "#a88be8"}
-PEOPLE = ["まい", "かず", "2人"]
 
 
 def get_connection():
@@ -36,10 +34,6 @@ def initialize_database():
         if "end_date" not in columns:
             connection.execute("ALTER TABLE plans ADD COLUMN end_date TEXT")
             connection.execute("UPDATE plans SET end_date = plan_date WHERE end_date IS NULL")
-        connection.execute("UPDATE plans SET person = 'まい' WHERE person = 'わたし'")
-        connection.execute("UPDATE plans SET person = 'かず' WHERE person = 'パートナー'")
-
-
 def add_plan(plan_date, end_date, title, place, memo, person):
     with get_connection() as connection:
         connection.execute(
@@ -83,7 +77,7 @@ def month_cells(year, month):
     return cells
 
 
-def render_month(year, month, plans):
+def render_month(year, month, plans, person_colors):
     plans_by_date = {}
     for plan in plans:
         start_date = date.fromisoformat(plan["plan_date"])
@@ -115,7 +109,7 @@ def render_month(year, month, plans):
                 today_class = " today" if current_date == date.today() else ""
                 plan_html = []
                 for plan in plans_by_date.get(date_key, []):
-                    color = PERSON_COLORS.get(plan["person"], "#9b8cff")
+                    color = person_colors.get(plan["person"], "#9b8cff")
                     label = html.escape(plan["title"])
                     memo = html.escape(plan["memo"] or "")
                     plan_html.append(
@@ -127,7 +121,7 @@ def render_month(year, month, plans):
                 )
 
 
-def render_calendar_tab():
+def render_calendar_tab(people):
     st.markdown(
         """
         <style>
@@ -183,8 +177,16 @@ def render_calendar_tab():
             st.rerun()
 
     plans = get_plans(year, month)
-    st.markdown("<div class='legend'>🌸 まい　　⚽ かず　　💜 2人</div>", unsafe_allow_html=True)
-    render_month(year, month, plans)
+    person_colors = {
+        people["self"]: "#ff7aa8",
+        people["partner"]: "#68b7ff",
+        people["together"]: "#a88be8",
+    }
+    st.markdown(
+        f"<div class='legend'>🌸 {people['self']}　　⚽ {people['partner']}　　💜 {people['together']}</div>",
+        unsafe_allow_html=True,
+    )
+    render_month(year, month, plans, person_colors)
 
     st.divider()
     form_column, list_column = st.columns([1, 1.2], gap="large")
@@ -192,11 +194,14 @@ def render_calendar_tab():
     with form_column:
         st.subheader("予定を追加する")
         with st.form("add_plan_form", clear_on_submit=True):
-            person = st.selectbox("誰の予定？", PEOPLE)
+            person = st.selectbox(
+                "誰の予定？",
+                [people["self"], people["partner"], people["together"]],
+            )
             plan_date = st.date_input("開始日", value=date.today())
             end_date = st.date_input("終了日（泊まりなどは別の日に設定）", value=date.today())
-            title = st.text_input("予定", placeholder="映画・かずの家にお泊りなど")
-            place = st.text_input("場所（任意）", placeholder="府中・宮城など")
+            title = st.text_input("予定", placeholder="映画・宿泊など")
+            place = st.text_input("場所（任意）", placeholder="東京・仙台など")
             memo = st.text_area("メモ（任意）", placeholder="チケットを予約する")
             submitted = st.form_submit_button("💗 予定を追加", use_container_width=True)
 

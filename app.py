@@ -6,6 +6,14 @@ from wishlist.wishlist_tab import render_wishlist_tab
 
 
 st.set_page_config(page_title="Calendar", page_icon="💗", layout="wide")
+
+with st.sidebar:
+    st.header("ふたりの設定")
+    self_name = st.text_input("自分の名前", value="自分", key="self_name").strip() or "自分"
+    partner_name = st.text_input("相手の名前", value="相手", key="partner_name").strip() or "相手"
+
+people = {"self": self_name, "partner": partner_name, "together": "2人"}
+
 st.markdown(
     """
     <style>
@@ -23,7 +31,7 @@ st.markdown(
     <div class="hero">
       <div class="eyebrow">OUR LITTLE PLANS</div>
       <h1>💗 Calendar</h1>
-    <p>まいとかずの予定共有機能</p>
+    <p>ふたりの予定共有機能</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -34,10 +42,10 @@ calendar_page, wishlist_page, memories_page = st.tabs(
 )
 
 with calendar_page:
-    render_calendar_tab()
+    render_calendar_tab(people)
 
 with wishlist_page:
-    render_wishlist_tab()
+    render_wishlist_tab(people)
 
 with memories_page:
     render_memory_tab()

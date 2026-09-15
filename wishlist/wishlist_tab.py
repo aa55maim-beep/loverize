@@ -54,7 +54,7 @@ def delete_item(item_id):
         connection.execute("DELETE FROM wishlist WHERE id = ?", (item_id,))
 
 
-def render_wishlist_tab():
+def render_wishlist_tab(people):
     initialize_database()
 
     st.markdown(
@@ -76,8 +76,11 @@ def render_wishlist_tab():
     with form_column:
         st.subheader("したいことを追加")
         with st.form("wishlist_form", clear_on_submit=True):
-            title = st.text_input("したいこと", placeholder="宮城に旅行する")
-            person = st.selectbox("誰のリスト？", ["まい", "かず", "2人"])
+            title = st.text_input("したいこと", placeholder="仙台に旅行する")
+            person = st.selectbox(
+                "誰のリスト？",
+                [people["self"], people["partner"], people["together"]],
+            )
             submitted = st.form_submit_button("✨ 追加する", use_container_width=True)
 
         if submitted:

@@ -84,8 +84,8 @@ def render_memory_tab():
         st.subheader("思い出を追加")
         with st.form("memory_form", clear_on_submit=True):
             memory_date = st.date_input("日にち", value=date.today())
-            title = st.text_input("タイトル", placeholder="宮城旅行・記念日ディナーなど")
-            place = st.text_input("場所（任意）", placeholder="宮城・府中など")
+            title = st.text_input("タイトル", placeholder="旅行・記念日ディナーなど")
+            place = st.text_input("場所（任意）", placeholder="東京・仙台など")
             memo = st.text_area("思い出メモ（任意）", placeholder="楽しかったことを書こう")
             image_file = st.file_uploader("写真（任意）", type=["jpg", "jpeg", "png", "webp"])
             submitted = st.form_submit_button("📸 思い出を追加", use_container_width=True)
