@@ -7,6 +7,34 @@ from wishlist.wishlist_tab import render_wishlist_tab
 
 st.set_page_config(page_title="Calendar", page_icon="💗", layout="wide")
 
+
+def require_allowed_user():
+    if not st.user.is_logged_in:
+        st.title("🔐 ログイン")
+        st.write("登録されたGoogleアカウントでログインしてください。")
+        if st.button("Googleでログイン"):
+            st.login("google")
+        st.stop()
+
+    allowed_emails = {
+        email.strip().lower()
+        for email in st.secrets.get("allowed_emails", [])
+        if email.strip()
+    }
+    user_email = st.user.email.strip().lower()
+
+    if user_email not in allowed_emails:
+        st.error("このアプリを利用できるアカウントではありません。")
+        st.button("ログアウト", on_click=st.logout)
+        st.stop()
+
+    with st.sidebar:
+        st.caption(f"ログイン中: {user_email}")
+        st.button("ログアウト", on_click=st.logout)
+
+
+require_allowed_user()
+
 with st.sidebar:
     st.header("ふたりの設定")
     self_name = st.text_input("自分の名前", value="自分", key="self_name").strip() or "自分"

@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 plans.db
 app.py.bak
+.streamlit/secrets.toml
