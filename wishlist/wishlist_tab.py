@@ -11,11 +11,18 @@ def initialize_database():
 
 
 def add_item(title, person):
-    get_connection().table("wishlist").insert({"title": title, "category": "", "person": person}).execute()
+    items = get_connection().table("wishlist").select("sort_order").eq("completed", False).order("sort_order", desc=True).limit(1).execute().data
+    next_order = (items[0]["sort_order"] + 1) if items else 0
+    get_connection().table("wishlist").insert({
+        "title": title,
+        "category": "",
+        "person": person,
+        "sort_order": next_order,
+    }).execute()
 
 
 def get_items():
-    return get_connection().table("wishlist").select("*").order("completed").order("id", desc=True).execute().data
+    return get_connection().table("wishlist").select("*").order("completed").order("sort_order").order("id").execute().data
 
 
 def update_item(item_id, completed):
@@ -24,6 +31,21 @@ def update_item(item_id, completed):
 
 def delete_item(item_id):
     get_connection().table("wishlist").delete().eq("id", item_id).execute()
+
+
+def move_item(item_id, direction):
+    client = get_connection()
+    items = client.table("wishlist").select("id, sort_order").eq("completed", False).order("sort_order").execute().data
+    current_index = next((index for index, item in enumerate(items) if item["id"] == item_id), None)
+    if current_index is None:
+        return
+    target_index = current_index + direction
+    if target_index < 0 or target_index >= len(items):
+        return
+    current_item = items[current_index]
+    target_item = items[target_index]
+    client.table("wishlist").update({"sort_order": target_item["sort_order"]}).eq("id", current_item["id"]).execute()
+    client.table("wishlist").update({"sort_order": current_item["sort_order"]}).eq("id", target_item["id"]).execute()
 
 
 def render_wishlist_tab(people):
@@ -64,25 +86,58 @@ def render_wishlist_tab(people):
                 st.rerun()
 
     with list_column:
-        st.subheader("ふたりのしたいこと")
+        heading_column, edit_column = st.columns([4, 1])
+        with heading_column:
+            st.subheader("ふたりのしたいこと")
+        with edit_column:
+            edit_mode = st.toggle("編集", key="wishlist_edit_mode")
+
         items = get_items()
         if not items:
             st.info("まだ項目がありません。最初のやりたいことを追加しよう！")
             return
 
-        for number, item in enumerate(items, start=1):
-            item_column, action_column = st.columns([5, 1], gap="small")
+        active_items = [item for item in items if not item["completed"]]
+        completed_items = [item for item in items if item["completed"]]
+
+        for number, item in enumerate(active_items, start=1):
+            item_column, done_column, action_column = st.columns([5, 1.2, 2.2], gap="small")
             with item_column:
-                completed = st.checkbox(
-                    f"{number}. {item['title']}",
-                    value=bool(item["completed"]),
-                    key=f"wishlist_completed_{item['id']}",
-                )
-                if completed != bool(item["completed"]):
-                    update_item(item["id"], completed)
-                    st.rerun()
+                st.markdown(f"**{number}. {item['title']}**")
                 st.caption(item["person"])
-            with action_column:
-                if st.button("削除", key=f"wishlist_delete_{item['id']}"):
-                    delete_item(item["id"])
+            with done_column:
+                if st.button("できた！", key=f"wishlist_done_{item['id']}"):
+                    update_item(item["id"], True)
                     st.rerun()
+            with action_column:
+                if edit_mode:
+                    up_column, down_column, delete_column = st.columns(3)
+                    with up_column:
+                        if st.button("↑", key=f"wishlist_up_{item['id']}", help="上へ"):
+                            move_item(item["id"], -1)
+                            st.rerun()
+                    with down_column:
+                        if st.button("↓", key=f"wishlist_down_{item['id']}", help="下へ"):
+                            move_item(item["id"], 1)
+                            st.rerun()
+                    with delete_column:
+                        if st.button("消去", key=f"wishlist_delete_{item['id']}"):
+                            delete_item(item["id"])
+                            st.rerun()
+
+        if completed_items:
+            st.divider()
+            st.subheader("叶えられたこと")
+            for item in completed_items:
+                item_column, restore_column, delete_column = st.columns([5, 1.2, 1.2], gap="small")
+                with item_column:
+                    st.markdown(f"~~{item['title']}~~")
+                    st.caption(item["person"])
+                with restore_column:
+                    if edit_mode and st.button("戻す", key=f"wishlist_restore_{item['id']}"):
+                        update_item(item["id"], False)
+                        st.rerun()
+                with delete_column:
+                    if edit_mode and st.button("消去", key=f"wishlist_done_delete_{item['id']}"):
+                        delete_item(item["id"])
+                        st.rerun()
