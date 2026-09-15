@@ -71,7 +71,6 @@ def render_month(year, month, plans, person_colors):
 
                 current_date = date(year, month, day_number)
                 date_key = current_date.isoformat()
-                today_class = " today" if current_date == date.today() else ""
                 plan_html = []
                 for plan in plans_by_date.get(date_key, []):
                     color = person_colors.get(plan["person"], "#9b8cff")
@@ -80,10 +79,16 @@ def render_month(year, month, plans, person_colors):
                     plan_html.append(
                         f"<div class='plan-chip' style='border-left-color:{color}' title='{memo}'>{label}</div>"
                     )
-                st.markdown(
-                    f"<div class='calendar-day'><div class='day-number{today_class}'>{day_number}</div>{''.join(plan_html)}</div>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown("<div class='calendar-day'>", unsafe_allow_html=True)
+                if st.button(
+                    str(day_number),
+                    key=f"select_date_{date_key}",
+                    help=f"{current_date.year}年{current_date.month}月{day_number}日を開始日にする",
+                    use_container_width=True,
+                ):
+                    st.session_state.selected_plan_date = current_date
+                    st.rerun()
+                st.markdown("".join(plan_html) + "</div>", unsafe_allow_html=True)
 
 
 def render_calendar_tab(people):
@@ -101,6 +106,8 @@ def render_calendar_tab(people):
         .day-number { color: #4b3d4c; font-weight: 700; padding: 0.35rem 0.45rem; }
         .day-number.today { background: #ffe0ec; border-radius: 999px; color: #c83f73; width: 2rem; text-align: center; }
         .calendar-day { background: rgba(255, 255, 255, 0.7); border: 1px solid #f3d9e4; border-radius: 0.55rem; box-sizing: border-box; height: 7rem; overflow: hidden; padding: 0.25rem; }
+        .calendar-day button { background: transparent; border: 0; color: #332b35 !important; font-weight: 700; justify-content: flex-start; min-height: 1.8rem; padding: 0.1rem 0.25rem; }
+        .calendar-day button:hover { background: #ffe0ec; border-color: #ffb5cd; }
         .empty-day { background: rgba(255, 255, 255, 0.25); }
         .plan-chip { background: white; border-left: 4px solid #ff7aa8; border-radius: 0.45rem; color: #332b35; font-size: 0.72rem; margin: 0.18rem 0; overflow: hidden; padding: 0.28rem 0.35rem; text-overflow: ellipsis; white-space: nowrap; }
         .legend { color: #332b35; font-size: 0.85rem; margin: 0.5rem 0 1rem; }
@@ -113,6 +120,8 @@ def render_calendar_tab(people):
     if "calendar_year" not in st.session_state:
         st.session_state.calendar_year = date.today().year
         st.session_state.calendar_month = date.today().month
+    if "selected_plan_date" not in st.session_state:
+        st.session_state.selected_plan_date = date.today()
 
     year = st.session_state.calendar_year
     month = st.session_state.calendar_month
@@ -158,13 +167,23 @@ def render_calendar_tab(people):
 
     with form_column:
         st.subheader("予定を追加する")
+        selected_plan_date = st.session_state.selected_plan_date
+        st.caption(f"開始日: {selected_plan_date.year}年{selected_plan_date.month}月{selected_plan_date.day}日")
         with st.form("add_plan_form", clear_on_submit=True):
             person = st.selectbox(
                 "誰の予定？",
                 [people["self"], people["partner"], people["together"]],
             )
-            plan_date = st.date_input("開始日", value=date.today())
-            end_date = st.date_input("終了日（泊まりなどは別の日に設定）", value=date.today())
+            plan_date = st.date_input(
+                "開始日",
+                value=selected_plan_date,
+                key=f"plan_start_{selected_plan_date.isoformat()}",
+            )
+            end_date = st.date_input(
+                "終了日（別の日にすると日またぎ）",
+                value=selected_plan_date,
+                key=f"plan_end_{selected_plan_date.isoformat()}",
+            )
             title = st.text_input("予定", placeholder="映画・宿泊など")
             place = st.text_input("場所（任意）", placeholder="東京・仙台など")
             memo = st.text_area("メモ（任意）", placeholder="チケットを予約する")
