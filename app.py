@@ -1,6 +1,6 @@
 import streamlit as st
 
-from calendar.calendar_tab import render_calendar_tab
+from calendar_app.calendar_tab import render_calendar_tab
 from memory import render_memory_tab
 from wishlist.wishlist_tab import render_wishlist_tab
 
