@@ -13,7 +13,7 @@ def require_allowed_user():
         st.title("🔐 ログイン")
         st.write("登録されたGoogleアカウントでログインしてください。")
         if st.button("Googleでログイン"):
-            st.login("google")
+            st.login()
         st.stop()
 
     allowed_emails = {
